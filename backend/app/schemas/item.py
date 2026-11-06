@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ItemBase(BaseModel):
     name: str = Field(min_length=1, max_length=255, examples=["Cơm rang"])
     description: str | None = Field(default=None, examples=["Mô tả ngắn"])
-    price: Decimal = Field(default=0, ge=0, examples=[45000])
+    price: Decimal = Field(default=Decimal('0'), ge=Decimal('0'), examples=[Decimal('45000')])
 
 
 class ItemCreate(ItemBase):
