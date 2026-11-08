@@ -9,8 +9,9 @@ không phải tự nhân/cộng lại ở phía client.
 """
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 
 def _to_money(value: Decimal | float | int) -> float:
@@ -72,3 +73,21 @@ class CartOut(BaseModel):
             Decimal("0"),
         )
         return _to_money(total)
+
+
+class CartItemCreate(BaseModel):
+    """Body của POST /cart/items: thêm `quantity` món `food_id` vào giỏ.
+
+    Nhận cả "foodId" (FE hay dùng) và "food_id" (kiểu Python) cho tiện.
+    """
+
+    food_id: int = Field(ge=1, examples=[1])
+    quantity: int = Field(default=1, ge=1, le=99, examples=[2])
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_camel_case(cls, data: Any) -> Any:
+        """Đổi foodId -> food_id trước khi kiểm tra dữ liệu."""
+        if isinstance(data, dict) and "foodId" in data and "food_id" not in data:
+            data = {**data, "food_id": data["foodId"]}
+        return data
