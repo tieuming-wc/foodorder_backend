@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
 from pydantic import BaseModel
+from typing import List
 from app.schemas.category import CategoryResponse
 
 
@@ -32,6 +33,17 @@ class FoodResponse(FoodBase):
     sales_count: int
     created_at: datetime
     category: CategoryResponse | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class FoodPaginatedResponse(BaseModel):
+    items: List[FoodResponse]
+    total: int
+    page: int
+    size: int
+    total_pages: int
 
     class Config:
         from_attributes = True
