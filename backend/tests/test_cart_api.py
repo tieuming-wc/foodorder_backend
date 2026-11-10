@@ -1,4 +1,4 @@
-"""Test API giỏ hàng (POST /api/cart/items, GET /api/cart) bằng SQLite trong bộ nhớ.
+"""Test API giỏ hàng (GET/POST/PUT/DELETE /api/cart...) bằng SQLite trong bộ nhớ.
 
 Chạy trong thư mục `backend/`:
 
@@ -68,6 +68,19 @@ class CartApiTestCase(unittest.TestCase):
         return self.client.post(
             "/api/cart/items",
             json={"foodId": food_id, "quantity": quantity},
+            headers=self.headers_an if headers is None else headers,
+        )
+
+    def _dat_so_luong(self, food_id, quantity, headers=None):
+        return self.client.put(
+            f"/api/cart/items/{food_id}",
+            json={"quantity": quantity},
+            headers=self.headers_an if headers is None else headers,
+        )
+
+    def _xoa_mon(self, food_id, headers=None):
+        return self.client.delete(
+            f"/api/cart/items/{food_id}",
             headers=self.headers_an if headers is None else headers,
         )
 
@@ -146,6 +159,133 @@ class CartApiTestCase(unittest.TestCase):
 
         self.assertEqual(cart_cua_an["total_quantity"], 2)
         self.assertEqual(cart_cua_binh["total_quantity"], 0)
+
+
+    # ------------------------------------------------------- sửa số lượng món
+    def test_put_doi_so_luong_va_tinh_lai_thanh_tien(self):
+        self._them_mon(self.com_id, 2)
+        response = self._dat_so_luong(self.com_id, 5)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["quantity"], 5)
+        self.assertEqual(data["line_total"], 225000.0)  # 45.000 × 5
+
+        cart = self.client.get("/api/cart", headers=self.headers_an).json()
+        self.assertEqual(cart["total_quantity"], 5)
+        self.assertEqual(cart["total_price"], 225000.0)
+
+    def test_put_tinh_lai_theo_gia_hien_tai_cua_mon(self):
+        self._them_mon(self.com_id, 2)
+
+        # Chủ quán đổi giá trong DB sau khi món đã nằm trong giỏ
+        db = self.Session()
+        db.get(Food, self.com_id).price = Decimal("50000")
+        db.commit()
+        db.close()
+
+        response = self._dat_so_luong(self.com_id, 3)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["line_total"], 150000.0)  # 50.000 × 3
+        cart = self.client.get("/api/cart", headers=self.headers_an).json()
+        self.assertEqual(cart["total_price"], 150000.0)
+
+    def test_put_khong_nhan_tien_tu_client(self):
+        self._them_mon(self.com_id, 1)
+
+        # Client cố gửi kèm đơn giá / thành tiền giả -> server bỏ qua
+        response = self.client.put(
+            f"/api/cart/items/{self.com_id}",
+            json={"quantity": 2, "price": 1, "line_total": 1},
+            headers=self.headers_an,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["line_total"], 90000.0)  # 45.000 × 2
+
+    def test_put_so_luong_khong_hop_le(self):
+        self._them_mon(self.com_id, 2)
+
+        for quantity in (0, -1, 100, 1000):
+            self.assertEqual(self._dat_so_luong(self.com_id, quantity).status_code, 422)
+
+    def test_put_mon_khong_co_trong_gio(self):
+        self._them_mon(self.com_id, 2)
+
+        self.assertEqual(self._dat_so_luong(self.tra_id, 3).status_code, 404)
+
+    def test_put_khong_sua_duoc_gio_nguoi_khac(self):
+        self._them_mon(self.com_id, 2, headers=self.headers_binh)
+
+        response = self._dat_so_luong(self.com_id, 5)  # an sửa món trong giỏ của bình
+
+        self.assertEqual(response.status_code, 404)
+        cart_binh = self.client.get("/api/cart", headers=self.headers_binh).json()
+        self.assertEqual(cart_binh["items"][0]["quantity"], 2)
+        cart_an = self.client.get("/api/cart", headers=self.headers_an).json()
+        self.assertEqual(cart_an["items"], [])
+
+    # ------------------------------------------------------------- xoá 1 món
+    def test_delete_mon_khoi_gio(self):
+        self._them_mon(self.com_id, 2)
+        self._them_mon(self.tra_id, 3)
+
+        response = self._xoa_mon(self.com_id)
+
+        self.assertEqual(response.status_code, 204)
+        cart = self.client.get("/api/cart", headers=self.headers_an).json()
+        self.assertEqual([item["food_id"] for item in cart["items"]], [self.tra_id])
+        self.assertEqual(cart["total_price"], 15000.0)
+
+    def test_delete_mon_khong_co_trong_gio(self):
+        self.assertEqual(self._xoa_mon(self.com_id).status_code, 404)
+
+        self._them_mon(self.com_id, 1)
+        self._xoa_mon(self.com_id)
+        self.assertEqual(self._xoa_mon(self.com_id).status_code, 404)
+
+    def test_delete_khong_xoa_duoc_gi_nguoi_khac(self):
+        self._them_mon(self.com_id, 2, headers=self.headers_binh)
+
+        self.assertEqual(self._xoa_mon(self.com_id).status_code, 404)
+        cart_binh = self.client.get("/api/cart", headers=self.headers_binh).json()
+        self.assertEqual(cart_binh["total_quantity"], 2)
+
+    # -------------------------------------------------------------- xoá cả giỏ
+    def test_delete_ca_gio(self):
+        self._them_mon(self.com_id, 2)
+        self._them_mon(self.tra_id, 3)
+
+        response = self.client.delete("/api/cart", headers=self.headers_an)
+
+        self.assertEqual(response.status_code, 204)
+        cart = self.client.get("/api/cart", headers=self.headers_an).json()
+        self.assertEqual(cart["items"], [])
+        self.assertEqual(cart["total_quantity"], 0)
+        self.assertEqual(cart["total_price"], 0.0)
+
+    def test_delete_ca_gio_khi_dang_trong_van_204(self):
+        self.assertEqual(
+            self.client.delete("/api/cart", headers=self.headers_binh).status_code, 204
+        )
+
+    def test_delete_ca_gio_khong_anh_huong_nguoi_khac(self):
+        self._them_mon(self.com_id, 2, headers=self.headers_binh)
+        self._them_mon(self.com_id, 1)
+
+        self.client.delete("/api/cart", headers=self.headers_an)
+
+        cart_binh = self.client.get("/api/cart", headers=self.headers_binh).json()
+        self.assertEqual(cart_binh["total_quantity"], 2)
+
+    # ------------------------------------------------- bắt buộc đăng nhập (mới)
+    def test_sua_va_xoa_deu_bat_buoc_dang_nhap(self):
+        self._them_mon(self.com_id, 2)
+
+        self.assertEqual(self._dat_so_luong(self.com_id, 3, headers={}).status_code, 401)
+        self.assertEqual(self._xoa_mon(self.com_id, headers={}).status_code, 401)
+        self.assertEqual(self.client.delete("/api/cart", headers={}).status_code, 401)
 
 
 if __name__ == "__main__":

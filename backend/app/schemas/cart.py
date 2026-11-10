@@ -91,3 +91,13 @@ class CartItemCreate(BaseModel):
         if isinstance(data, dict) and "foodId" in data and "food_id" not in data:
             data = {**data, "food_id": data["foodId"]}
         return data
+
+
+class CartItemUpdate(BaseModel):
+    """Body của PUT /cart/items/{food_id}: đặt lại số lượng của món trong giỏ.
+
+    Chỉ nhận đúng `quantity` (1..99). Không nhận đơn giá / thành tiền từ client:
+    tiền luôn được tính lại ở server theo giá hiện tại trong bảng `foods`.
+    """
+
+    quantity: int = Field(ge=1, le=99, examples=[3])
