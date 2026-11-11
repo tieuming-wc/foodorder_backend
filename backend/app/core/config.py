@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
     CORS_ORIGINS: str = "*"
 
+    # Khoá ký token đăng nhập. Đổi thành chuỗi ngẫu nhiên khi deploy thật.
+    SECRET_KEY: str = "doi-secret-key-nay-khi-deploy"
+    # Thời hạn token đăng nhập (phút). Mặc định 7 ngày.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
+
     @property
     def database_url(self) -> str:
         # mysql+pymysql://user:password@host:port/database
