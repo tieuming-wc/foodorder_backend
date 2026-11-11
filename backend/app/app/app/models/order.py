@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DECIMAL, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from app.db.base_class import Base  # Hoặc đường dẫn Base tùy theo project của bạn
+from app.db.session import Base   # Hoặc đường dẫn Base tùy theo project của bạn
 
 class Order(Base):
     __tablename__ = "orders"
