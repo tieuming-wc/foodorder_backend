@@ -123,8 +123,16 @@ Kiểm tra:
 | POST | `/api/items` | Thêm mới | `{"name": "Trà đá", "description": "...", "price": 5000}` |
 | PUT | `/api/items/{id}` | Sửa (gửi trường nào sửa trường đó) | `{"price": 6000}` |
 | DELETE | `/api/items/{id}` | Xoá | |
+| GET | `/api/cart` | Giỏ hàng của tôi: từng dòng + thành tiền + tổng tiền | |
+| POST | `/api/cart/items` | Thêm món vào giỏ (món đã có thì cộng dồn số lượng) | `{"foodId": 1, "quantity": 2}` |
 
 Khi lỗi, API trả về JSON dạng `{"detail": "..."}`. Ví dụ: 404 khi không tìm thấy, 422 khi dữ liệu gửi lên sai.
+
+Hai API giỏ hàng bắt buộc đăng nhập: gửi header `Authorization: Bearer <access_token>`.
+Repo chưa có API đăng nhập nên khi cần thử, tạo token bằng `create_access_token(user.id)`
+trong `app/core/security.py` (task đăng nhập/đăng ký sẽ dùng lại các hàm ở đó).
+
+Chạy test (không cần MySQL) trong thư mục `backend/`: `python -m unittest discover -s tests -v`
 
 ## 8. Frontend nối với backend thế nào?
 
