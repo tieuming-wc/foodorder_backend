@@ -129,6 +129,8 @@ Kiểm tra:
 | GET | `/api/auth/me` | Xem tài khoản đang đăng nhập (cần token) | |
 | GET | `/api/orders/me` | Toàn bộ đơn tôi đã đặt, mới nhất lên đầu (cần token). Lọc `?status=pending` | |
 | PUT | `/api/orders/{id}/cancel` | Huỷ đơn của tôi (cần token), **chỉ khi đơn đang `pending`** | |
+| GET | `/api/admin/orders` | Danh sách đơn của **mọi khách** (chỉ admin). Lọc `?status=`, phân trang `?page=1&limit=20` | |
+| PUT | `/api/admin/orders/{id}/status` | Đổi trạng thái đơn (chỉ admin): `confirmed` / `shipping` / `completed` / `cancelled`, theo đúng luồng | |
 
 Khi lỗi, API trả về JSON dạng `{"detail": "..."}`. Ví dụ: 404 khi không tìm thấy, 422 khi dữ liệu gửi lên sai, 401 khi thiếu token, 403 khi không đủ quyền.
 
