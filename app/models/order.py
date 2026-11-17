@@ -6,11 +6,15 @@ lịch sử mua hàng vẫn hiển thị đúng như lúc đặt.
 """
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:  # chi de type hint, tranh import vong khi chay
+    from app.models.user import User
 
 # Các trạng thái của 1 đơn hàng
 # pending = Chờ duyệt, confirmed = Đã xác nhận, shipping = Đang giao,
@@ -18,6 +22,26 @@ from app.db.session import Base
 ORDER_STATUSES = ("pending", "confirmed", "shipping", "completed", "cancelled")
 # Chỉ đơn còn "Chờ duyệt" mới được tự huỷ
 CANCELABLE_STATUSES = ("pending",)
+
+# Nhãn tiếng Việt để thông báo lỗi dễ hiểu
+STATUS_LABELS = {
+    "pending": "Chờ duyệt",
+    "confirmed": "Đã xác nhận",
+    "shipping": "Đang giao",
+    "completed": "Hoàn thành",
+    "cancelled": "Đã hủy",
+}
+
+# Luồng trạng thái admin được phép chuyển: pending -> confirmed -> shipping -> completed.
+# Đơn đã "cancelled" hoặc "completed" là trạng thái cuối, không đi tiếp được nữa
+# (vd không thể chuyển "Đã hủy" sang "Hoàn thành").
+ADMIN_TRANSITIONS = {
+    "pending": ("confirmed", "cancelled"),
+    "confirmed": ("shipping", "cancelled"),
+    "shipping": ("completed",),
+    "completed": (),
+    "cancelled": (),
+}
 
 
 class Order(Base):
@@ -44,6 +68,8 @@ class Order(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    # Thông tin khách đặt đơn, dùng cho bảng quản lý đơn của admin (cũng selectin).
+    user: Mapped["User"] = relationship(lazy="selectin")
 
     @property
     def can_cancel(self) -> bool:

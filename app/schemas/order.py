@@ -3,8 +3,9 @@
 API tạo đơn do phần đặt hàng làm, ở đây chỉ có lịch sử mua hàng + huỷ đơn.
 """
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.models.order import CANCELABLE_STATUSES
 
@@ -52,3 +53,41 @@ class CancelOrderOut(BaseModel):
 
     message: str
     order: OrderOut
+
+
+class AdminOrderCustomer(BaseModel):
+    """Thông tin người đặt, để admin biết đơn này của ai (không trả mật khẩu)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    full_name: str | None
+    email: str | None
+    is_active: bool
+
+
+class AdminOrderOut(OrderOut):
+    """1 đơn trong bảng quản lý: đủ chi tiết món + thông tin khách đặt."""
+
+    user_id: int
+    user: AdminOrderCustomer
+
+
+class AdminOrderListOut(BaseModel):
+    """Danh sách đơn cho admin, có phân trang."""
+
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+    items: list[AdminOrderOut]
+
+
+class AdminOrderStatusUpdate(BaseModel):
+    """Trạng thái admin muốn chuyển đơn sang (Duyệt / Đang giao / Hoàn thành / Đã huỷ)."""
+
+    status: Literal["confirmed", "shipping", "completed", "cancelled"] = Field(
+        examples=["confirmed"],
+        description="confirmed = duyệt đơn, shipping = đang giao, completed = hoàn thành, cancelled = huỷ đơn",
+    )

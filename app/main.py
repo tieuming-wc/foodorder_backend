@@ -23,7 +23,7 @@ import app.models  # noqa: E402,F401 - import để SQLAlchemy biết các bản
 from app.core.config import settings  # noqa: E402
 from app.db.migrations import apply_column_migrations  # noqa: E402
 from app.db.session import Base, engine  # noqa: E402
-from app.routers import auth, health, items, orders  # noqa: E402
+from app.routers import admin_orders, auth, health, items, orders  # noqa: E402
 
 
 def _use_utf8_console() -> None:
@@ -78,6 +78,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(admin_orders.router, prefix="/api")
 
 
 @app.get("/")
