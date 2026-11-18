@@ -4,10 +4,13 @@ from decimal import Decimal
 from fastapi import HTTPException, status, APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.core.deps import get_current_admin_user
 from app.models.food import Food
+from app.models.category import Category
+from app.models.user import User
 from pydantic import BaseModel
 from typing import List
-from app.schemas.food import FoodResponse, FoodPaginatedResponse
+from app.schemas.food import FoodCreate, FoodUpdate, FoodResponse, FoodPaginatedResponse
 
 router = APIRouter(
     prefix="/foods",
@@ -85,3 +88,90 @@ def get_food_detail(food_id: int, db: Session = Depends(get_db)):
         )
 
     return food
+
+
+@router.post("", response_model=FoodResponse, status_code=status.HTTP_201_CREATED)
+def create_food(
+    food_in: FoodCreate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    category = db.query(Category).filter(
+        Category.id == food_in.category_id).first()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID danh mục không hợp lệ hoặc không tồn tại."
+        )
+
+    new_food = Food(
+        name=food_in.name,
+        description=food_in.description,
+        price=food_in.price,
+        image=food_in.image,
+        is_available=food_in.is_available,
+        category_id=food_in.category_id
+    )
+
+    db.add(new_food)
+    db.commit()
+    db.refresh(new_food)
+    return new_food
+
+
+@router.put("/{food_id}", response_model=FoodResponse)
+def update_food(
+    food_id: int,
+    food_in: FoodUpdate,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    food = db.query(Food).filter(Food.id == food_id).first()
+    if not food:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Món ăn không tồn tại."
+        )
+
+    if food_in.category_id is not None:
+        category = db.query(Category).filter(
+            Category.id == food_in.category_id).first()
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ID danh mục mới không hợp lệ hoặc không tồn tại."
+            )
+        food.category_id = food_in.category_id
+
+    if food_in.name is not None:
+        food.name = food_in.name
+    if food_in.description is not None:
+        food.description = food_in.description
+    if food_in.price is not None:
+        food.price = food_in.price
+    if food_in.image is not None:
+        food.image = food_in.image
+    if food_in.is_available is not None:
+        food.is_available = food_in.is_available
+
+    db.commit()
+    db.refresh(food)
+    return food
+
+
+@router.delete("/{food_id}", status_code=status.HTTP_200_OK)
+def delete_food(
+    food_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user)
+):
+    food = db.query(Food).filter(Food.id == food_id).first()
+    if not food:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Món ăn không tồn tại."
+        )
+
+    db.delete(food)
+    db.commit()
+    return {"detail": "Xóa món ăn thành công."}
