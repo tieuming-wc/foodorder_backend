@@ -5,7 +5,7 @@ Khung backend chung cho các nhóm thực tập lớp **HN-KS25-CNTT1**. Đã c�
 - Kết nối **MySQL** bằng SQLAlchemy + PyMySQL, cấu hình đọc từ file `.env`
 - **CRUD mẫu** cho bảng `items` (thêm / xem / sửa / xoá / tìm kiếm)
 - **Đăng nhập bằng token (JWT)**: đăng ký, đăng nhập lấy token, gửi token ở header `Authorization: Bearer ...` (không dùng OAuth2)
-- Endpoint **health-check** `GET /api/health` kiểm tra kết nối DB
+- Endpoint **health-check** `GET /api/health` kiểm tra kết nối DB (gọi `GET /health` cũng được, dùng cho dịch vụ deploy / uptime monitor)
 - **CORS** đã bật để frontend gọi được
 - File `sql/init.sql` tạo database + bảng + dữ liệu mẫu, chạy bằng **MySQL Workbench**
 - Trang tài liệu API tự sinh: http://127.0.0.1:8000/docs
@@ -118,7 +118,7 @@ Kiểm tra:
 
 | Method | URL | Việc làm | Body (JSON) |
 |---|---|---|---|
-| GET | `/api/health` | Kiểm tra server + DB | |
+| GET | `/api/health` | Kiểm tra server + DB (bản gốc không prefix: `/health`) | |
 | GET | `/api/items` | Danh sách, tìm theo tên `?q=com` (cần token) | |
 | GET | `/api/items/{id}` | Chi tiết (cần token) | |
 | POST | `/api/items` | Thêm mới (**chỉ admin**) | `{"name": "Trà đá", "description": "...", "price": 5000}` |
@@ -129,6 +129,8 @@ Kiểm tra:
 | GET | `/api/auth/me` | Xem tài khoản đang đăng nhập (cần token) | |
 | GET | `/api/orders/me` | Toàn bộ đơn tôi đã đặt, mới nhất lên đầu (cần token). Lọc `?status=pending` | |
 | PUT | `/api/orders/{id}/cancel` | Huỷ đơn của tôi (cần token), **chỉ khi đơn đang `pending`** | |
+| GET | `/api/admin/orders` | Danh sách đơn của **mọi khách** (chỉ admin). Lọc `?status=`, phân trang `?page=1&limit=20` | |
+| PUT | `/api/admin/orders/{id}/status` | Đổi trạng thái đơn (chỉ admin): `confirmed` / `shipping` / `completed` / `cancelled`, theo đúng luồng | |
 
 Khi lỗi, API trả về JSON dạng `{"detail": "..."}`. Ví dụ: 404 khi không tìm thấy, 422 khi dữ liệu gửi lên sai, 401 khi thiếu token, 403 khi không đủ quyền.
 

@@ -23,7 +23,15 @@ import app.models  # noqa: E402,F401 - import để SQLAlchemy biết các bản
 from app.core.config import settings  # noqa: E402
 from app.db.migrations import apply_column_migrations  # noqa: E402
 from app.db.session import Base, engine  # noqa: E402
-from app.routers import auth, health, items, orders  # noqa: E402
+from app.routers import (  # noqa: E402
+    admin_orders,
+    auth,
+    cart,
+    categories,
+    health,
+    items,
+    orders,
+)
 
 
 def _use_utf8_console() -> None:
@@ -73,11 +81,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Health-check có thêm bản ở gốc /health (không có /api) vì các dịch vụ deploy /
+# uptime monitor thường gọi thẳng GET /health và trước đây nhận 404 liên tục.
+app.include_router(health.router)
+
 # Mọi API đều bắt đầu bằng /api. Thêm router mới thì include ở đây.
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(categories.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
+app.include_router(cart.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(admin_orders.router, prefix="/api")
 
 
 @app.get("/")
