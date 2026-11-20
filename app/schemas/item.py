@@ -12,6 +12,12 @@ class ItemBase(BaseModel):
     name: str = Field(min_length=1, max_length=255, examples=["Cơm rang"])
     description: str | None = Field(default=None, examples=["Mô tả ngắn"])
     price: Decimal = Field(default=0, ge=0, examples=[45000])
+    image_url: str | None = Field(
+        default=None,
+        max_length=500,
+        examples=["https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800"],
+    )
+    category_id: int | None = Field(default=None, examples=[1])
 
 
 class ItemCreate(ItemBase):
@@ -24,6 +30,8 @@ class ItemUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     price: Decimal | None = Field(default=None, ge=0)
+    image_url: str | None = Field(default=None, max_length=500)
+    category_id: int | None = None
 
     @field_validator("name", "price")
     @classmethod

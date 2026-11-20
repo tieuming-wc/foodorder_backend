@@ -1,5 +1,6 @@
 """API đơn hàng của user đang đăng nhập. Đường dẫn đầy đủ:
 
+    POST /api/orders/checkout           đặt hàng từ giỏ (tự xoá giỏ sau khi tạo đơn)
     GET /api/orders/me                  toàn bộ đơn đã đặt, mới nhất lên đầu
     PUT /api/orders/{order_id}/cancel   tự huỷ đơn của chính mình
 
@@ -15,10 +16,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
+from app.crud import cart as cart_crud
 from app.crud import order as order_crud
 from app.db.session import get_db
 from app.models.order import ORDER_STATUSES, Order
 from app.models.user import User
+from app.schemas.checkout import CheckoutIn, CheckoutOut
 from app.schemas.order import CancelOrderOut, OrderOut
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -30,6 +33,37 @@ _CANNOT_CANCEL_REASON = {
     "completed": "Đơn hàng đã hoàn thành nên không thể huỷ",
     "cancelled": "Đơn hàng này đã bị huỷ trước đó",
 }
+
+
+@router.post("/checkout", response_model=CheckoutOut, status_code=201)
+def checkout(
+    data: CheckoutIn | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Đặt hàng: biến toàn bộ giỏ hàng thành 1 đơn, sau đó giỏ phải TRỐNG.
+
+    Đơn + việc dọn giỏ nằm trong cùng 1 transaction (xem order_crud.checkout_cart):
+    tạo đơn lỗi thì giỏ không bị mất món.
+    """
+    cart_items = cart_crud.get_cart_items(db, current_user.id)
+    if not cart_items:
+        raise HTTPException(
+            status_code=400,
+            detail="Giỏ hàng đang trống, hãy thêm món trước khi đặt hàng",
+        )
+
+    order = order_crud.checkout_cart(
+        db,
+        user_id=current_user.id,
+        cart_items=cart_items,
+        note=data.note if data else None,
+    )
+    return CheckoutOut(
+        message=f"Đặt hàng thành công, đơn #{order.id} đang chờ duyệt",
+        order=OrderOut.model_validate(order),
+        cart_is_cleared=True,
+    )
 
 
 @router.get("/me", response_model=list[OrderOut])
