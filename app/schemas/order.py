@@ -65,6 +65,7 @@ class AdminOrderCustomer(BaseModel):
     full_name: str | None
     email: str | None
     is_active: bool
+    role: str
 
 
 class AdminOrderOut(OrderOut):
@@ -72,6 +73,10 @@ class AdminOrderOut(OrderOut):
 
     user_id: int
     user: AdminOrderCustomer
+    restaurant_id: int | None
+    shipper_id: int | None
+    restaurant: AdminOrderCustomer | None
+    shipper: AdminOrderCustomer | None
 
 
 class AdminOrderListOut(BaseModel):

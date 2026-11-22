@@ -58,6 +58,8 @@ def checkout(
         user_id=current_user.id,
         cart_items=cart_items,
         note=data.note if data else None,
+        # Chia đơn cho nhà hàng ít đơn nhất trong 3 tài khoản nhà hàng
+        restaurant_id=order_crud.pick_restaurant_id(db),
     )
     return CheckoutOut(
         message=f"Đặt hàng thành công, đơn #{order.id} đang chờ duyệt",

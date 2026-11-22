@@ -52,6 +52,14 @@ class Order(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    # Nhà hàng xử lý đơn (tài khoản role = restaurant). Null = chưa gán.
+    restaurant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Shipper nhận giao đơn (tài khoản role = shipper). Null = chưa ai nhận.
+    shipper_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -69,7 +77,14 @@ class Order(Base):
         lazy="selectin",
     )
     # Thông tin khách đặt đơn, dùng cho bảng quản lý đơn của admin (cũng selectin).
-    user: Mapped["User"] = relationship(lazy="selectin")
+    user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")
+    # Nhà hàng / shipper của đơn (cùng trỏ tới users nên phải chỉ rõ khoá ngoại).
+    restaurant: Mapped["User | None"] = relationship(
+        foreign_keys=[restaurant_id], lazy="selectin"
+    )
+    shipper: Mapped["User | None"] = relationship(
+        foreign_keys=[shipper_id], lazy="selectin"
+    )
 
     @property
     def can_cancel(self) -> bool:

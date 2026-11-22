@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shipper · Savors</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/shipper" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 8" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M2 7c2.6-3.6 6-5.4 10-5.4S19.4 3.4 22 7"></path></svg>
+        </span>
+        <span class="brand-name">Savors</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="nav">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="header-nav" id="nav">
+        <a href="/admin">Quản trị</a>
+        <a href="/restaurant">Nhà hàng</a>
+        <a href="/shipper" class="active">Shipper</a>
+      </nav>
+      <div class="header-actions">
+        <span class="header-user">
+          <span class="avatar" data-user-avatar>?</span>
+          <span class="user-meta">
+            <span data-user-name>...</span>
+            <small data-user-role>Shipper</small>
+          </span>
+        </span>
+        <button class="btn btn-outline btn-sm" type="button" data-logout>Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="page-head">
+      <span class="eyebrow eyebrow--gold">Giao hàng · Shipper</span>
+      <h1>Mỗi chuyến, một trọn vẹn.</h1>
+      <p>Nhận đơn đã được nhà hàng xác nhận và báo lại khi giao xong cho khách.</p>
+    </div>
+
+    <section class="stat-grid three">
+      <div class="stat pending">
+        <div class="stat-label">Đơn chờ nhận</div>
+        <div class="stat-value" data-stat="available">0</div>
+      </div>
+      <div class="stat shipping">
+        <div class="stat-label">Đang giao</div>
+        <div class="stat-value" data-stat="shipping">0</div>
+      </div>
+      <div class="stat done">
+        <div class="stat-label">Đã giao</div>
+        <div class="stat-value" data-stat="completed">0</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Đơn có thể nhận</h2>
+        <span class="spacer"></span>
+        <button class="btn btn-outline btn-sm" id="refresh" type="button">Làm mới</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Đơn</th>
+              <th>Nhà hàng</th>
+              <th>Khách</th>
+              <th>Món</th>
+              <th>Tổng tiền</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="availableBody">
+            <tr><td colspan="6"><div class="empty">Đang tải đơn...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Đơn của tôi</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Đơn</th>
+              <th>Nhà hàng</th>
+              <th>Khách</th>
+              <th>Món</th>
+              <th>Tổng tiền</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="mineBody">
+            <tr><td colspan="7"><div class="empty">Đang tải đơn...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const ME = requireRole("shipper");
+    let available = [];
+    let mine = [];
+
+    function orderInfo(order) {
+      return {
+        restaurant: order.restaurant
+          ? `${escapeHtml(order.restaurant.full_name)}<br><span class="muted">@${escapeHtml(order.restaurant.username)}</span>`
+          : '<span class="muted">Chưa gán</span>',
+        customer: escapeHtml(order.user.full_name || order.user.username),
+      };
+    }
+
+    function availableRow(order) {
+      const info = orderInfo(order);
+      return `<tr>
+        <td><b>#${order.id}</b><br><span class="muted">${formatDate(order.created_at)}</span></td>
+        <td>${info.restaurant}</td>
+        <td>${info.customer}</td>
+        <td>${orderItemsHtml(order)}</td>
+        <td><b>${money(order.total_amount)}</b></td>
+        <td><button class="btn small primary" data-action="accept" data-id="${order.id}">Nhận giao</button></td>
+      </tr>`;
+    }
+
+    function mineRow(order) {
+      const info = orderInfo(order);
+      const action =
+        order.status === "shipping"
+          ? `<button class="btn small primary" data-action="delivered" data-id="${order.id}">Đã giao</button>`
+          : `<span class="muted">—</span>`;
+      return `<tr>
+        <td><b>#${order.id}</b><br><span class="muted">${formatDate(order.created_at)}</span></td>
+        <td>${info.restaurant}</td>
+        <td>${info.customer}</td>
+        <td>${orderItemsHtml(order)}</td>
+        <td><b>${money(order.total_amount)}</b></td>
+        <td>${statusBadge(order.status)}</td>
+        <td><div class="actions">${action}</div></td>
+      </tr>`;
+    }
+
+    function render() {
+      document.getElementById("availableBody").innerHTML = available.length
+        ? available.map(availableRow).join("")
+        : `<tr><td colspan="6"><div class="empty">Hiện chưa có đơn nào chờ nhận</div></td></tr>`;
+
+      document.getElementById("mineBody").innerHTML = mine.length
+        ? mine.map(mineRow).join("")
+        : `<tr><td colspan="7"><div class="empty">Bạn chưa nhận đơn nào</div></td></tr>`;
+
+      setText('[data-stat="available"]', available.length);
+      setText('[data-stat="shipping"]', mine.filter((o) => o.status === "shipping").length);
+      setText('[data-stat="completed"]', mine.filter((o) => o.status === "completed").length);
+    }
+
+    async function load() {
+      try {
+        [available, mine] = await Promise.all([
+          api("/shipper/orders/available"),
+          api("/shipper/orders/mine"),
+        ]);
+        render();
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    bindActions(async ({ action, id }) => {
+      if (action !== "accept" && action !== "delivered") return;
+      const path = action === "accept" ? "accept" : "delivered";
+      try {
+        await api(`/shipper/orders/${id}/${path}`, { method: "PUT" });
+        toast(action === "accept" ? `Đã nhận đơn #${id}` : `Đã giao đơn #${id}`, "success");
+        load();
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+
+    document.getElementById("refresh").addEventListener("click", load);
+
+    if (ME) load();
+  </script>
+</body>
+</html>

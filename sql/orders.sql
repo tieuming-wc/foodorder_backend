@@ -13,6 +13,8 @@ USE app_db;
 CREATE TABLE IF NOT EXISTS orders (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   user_id      INT NOT NULL,
+  restaurant_id INT NULL, -- nhà hàng xử lý đơn (users.role = 'restaurant')
+  shipper_id   INT NULL,  -- shipper nhận giao (users.role = 'shipper')
   status       VARCHAR(20) NOT NULL DEFAULT 'pending',
   total_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
   note         TEXT NULL,
@@ -21,7 +23,11 @@ CREATE TABLE IF NOT EXISTS orders (
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_orders_user_created (user_id, created_at),
   KEY idx_orders_status (status),
-  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+  KEY idx_orders_restaurant (restaurant_id),
+  KEY idx_orders_shipper (shipper_id),
+  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_orders_restaurant FOREIGN KEY (restaurant_id) REFERENCES users (id) ON DELETE SET NULL,
+  CONSTRAINT fk_orders_shipper FOREIGN KEY (shipper_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Các dòng hàng của đơn. Lưu tên + giá tại lúc mua để lịch sử không đổi khi item bị sửa/xoá.

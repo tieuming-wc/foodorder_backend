@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 
 # Chạy `uvicorn main:app` trong app/ thì thư mục cha của package `app` chưa có trên
@@ -24,6 +26,7 @@ from app.core.config import settings  # noqa: E402
 from app.db.migrations import apply_column_migrations  # noqa: E402
 from app.db.session import Base, engine  # noqa: E402
 from app.routers import (  # noqa: E402
+    accounts,
     admin_orders,
     auth,
     cart,
@@ -31,6 +34,8 @@ from app.routers import (  # noqa: E402
     health,
     items,
     orders,
+    restaurant,
+    shipper,
 )
 
 
@@ -93,8 +98,46 @@ app.include_router(items.router, prefix="/api")
 app.include_router(cart.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(admin_orders.router, prefix="/api")
+app.include_router(accounts.router, prefix="/api")
+app.include_router(restaurant.router, prefix="/api")
+app.include_router(shipper.router, prefix="/api")
+
+# 3 trang quản trị (HTML + JS thuần, không cần build frontend).
+#   /admin       quản trị đơn hàng + 10 tài khoản
+#   /restaurant  nhà hàng xác nhận đơn / xem đơn của mình
+#   /shipper     shipper nhận giao + báo đã giao
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/login", include_in_schema=False)
+def login_page():
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_page():
+    return FileResponse(STATIC_DIR / "admin.html")
+
+
+@app.get("/restaurant", include_in_schema=False)
+def restaurant_page():
+    return FileResponse(STATIC_DIR / "restaurant.html")
+
+
+@app.get("/shipper", include_in_schema=False)
+def shipper_page():
+    return FileResponse(STATIC_DIR / "shipper.html")
 
 
 @app.get("/")
 def root():
-    return {"message": f"{settings.APP_NAME} đang chạy. Xem tài liệu API tại /docs"}
+    return {
+        "message": f"{settings.APP_NAME} đang chạy. Xem tài liệu API tại /docs",
+        "pages": {
+            "login": "/login",
+            "admin": "/admin",
+            "restaurant": "/restaurant",
+            "shipper": "/shipper",
+        },
+    }

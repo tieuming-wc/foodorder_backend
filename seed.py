@@ -4,7 +4,8 @@ Cách chạy (đứng trong thư mục backend/):
     python seed.py
 
 Dữ liệu tạo ra:
-    - 1 admin (admin / 123456) và 4 user (user1..user4 / 123456)
+    - 10 tài khoản / mật khẩu chung 123456, chia 4 vai trò:
+        1 admin, 3 khách (khach1..3), 3 nhà hàng (nhahang1..3), 3 shipper (shipper1..3)
     - 5 danh mục (categories)
     - 20 món ăn (items) có link ảnh mạng, chia đủ 5 danh mục
     - Giỏ hàng mẫu cho user1 (2-3 món) để test màn hình giỏ
@@ -13,8 +14,8 @@ Dữ liệu tạo ra:
 
 Script tự tạo bảng còn thiếu (Base.metadata.create_all) và tự thêm cột mới cho bảng
 đã có (app/db/migrations.py) nên chạy được trên database cũ.
-Chạy lại script: user / danh mục / món được cập nhật tại chỗ; đơn hàng và giỏ của 5
-tài khoản seed được tạo lại từ đầu (không nhân đôi dữ liệu).
+Chạy lại script: tài khoản / danh mục / món được cập nhật tại chỗ; đơn hàng và giỏ
+của 10 tài khoản seed được tạo lại từ đầu (không nhân đôi dữ liệu).
 """
 import sys
 from datetime import datetime, timedelta
@@ -33,7 +34,13 @@ from app.models.cart import CartItem
 from app.models.category import Category
 from app.models.item import Item
 from app.models.order import Order, OrderItem
-from app.models.user import User
+from app.models.user import (
+    ROLE_ADMIN,
+    ROLE_CUSTOMER,
+    ROLE_RESTAURANT,
+    ROLE_SHIPPER,
+    User,
+)
 
 SEED_PASSWORD = "123456"  # mật khẩu chung cho mọi tài khoản mẫu
 
@@ -41,37 +48,80 @@ SEED_PASSWORD = "123456"  # mật khẩu chung cho mọi tài khoản mẫu
 # Tài khoản mẫu
 # ---------------------------------------------------------------------------
 SEED_USERS: list[dict] = [
+    # 1 admin
     {
         "username": "admin",
         "full_name": "Quản trị viên",
         "email": "admin@example.com",
-        "is_admin": True,
+        "role": ROLE_ADMIN,
     },
+    # 3 khách hàng
     {
-        "username": "user1",
+        "username": "khach1",
         "full_name": "Nguyễn Văn An",
-        "email": "an@example.com",
-        "is_admin": False,
+        "email": "khach1@example.com",
+        "role": ROLE_CUSTOMER,
     },
     {
-        "username": "user2",
+        "username": "khach2",
         "full_name": "Trần Thị Bình",
-        "email": "binh@example.com",
-        "is_admin": False,
+        "email": "khach2@example.com",
+        "role": ROLE_CUSTOMER,
     },
     {
-        "username": "user3",
+        "username": "khach3",
         "full_name": "Lê Hoàng Cường",
-        "email": "cuong@example.com",
-        "is_admin": False,
+        "email": "khach3@example.com",
+        "role": ROLE_CUSTOMER,
+    },
+    # 3 nhà hàng
+    {
+        "username": "nhahang1",
+        "full_name": "Nhà hàng Cơm Việt",
+        "email": "nhahang1@example.com",
+        "role": ROLE_RESTAURANT,
     },
     {
-        "username": "user4",
-        "full_name": "Phạm Thu Dung",
-        "email": "dung@example.com",
-        "is_admin": False,
+        "username": "nhahang2",
+        "full_name": "Nhà hàng Phở Hà Nội",
+        "email": "nhahang2@example.com",
+        "role": ROLE_RESTAURANT,
+    },
+    {
+        "username": "nhahang3",
+        "full_name": "Nhà hàng Bún Huế",
+        "email": "nhahang3@example.com",
+        "role": ROLE_RESTAURANT,
+    },
+    # 3 shipper
+    {
+        "username": "shipper1",
+        "full_name": "Phạm Minh Tú",
+        "email": "shipper1@example.com",
+        "role": ROLE_SHIPPER,
+    },
+    {
+        "username": "shipper2",
+        "full_name": "Đỗ Văn Hùng",
+        "email": "shipper2@example.com",
+        "role": ROLE_SHIPPER,
+    },
+    {
+        "username": "shipper3",
+        "full_name": "Hoàng Anh Sơn",
+        "email": "shipper3@example.com",
+        "role": ROLE_SHIPPER,
     },
 ]
+
+# Tài khoản mẫu của bản cũ (user1..user4). Chỉ xoá khi đúng cả username + email mẫu
+# để không làm mất tài khoản thật người dùng đã tạo trùng tên.
+LEGACY_SEED_USERS = {
+    "user1": "an@example.com",
+    "user2": "binh@example.com",
+    "user3": "cuong@example.com",
+    "user4": "dung@example.com",
+}
 
 # ---------------------------------------------------------------------------
 # 5 danh mục
@@ -242,70 +292,90 @@ SEED_ITEMS: list[dict] = [
 # ---------------------------------------------------------------------------
 SEED_ORDERS: list[dict] = [
     {
-        "username": "user1",
+        "username": "khach1",
+        "restaurant": "nhahang1",
+        "shipper": None,
         "status": "pending",
         "days_ago": 0,
         "note": "Giao tới tầng 3, gọi trước khi tới.",
         "lines": [("Cơm tấm sườn nướng", 1), ("Trà đá", 1)],
     },
     {
-        "username": "user2",
+        "username": "khach2",
+        "restaurant": "nhahang2",
+        "shipper": None,
         "status": "pending",
         "days_ago": 1,
         "note": None,
         "lines": [("Phở bò tái", 2)],
     },
     {
-        "username": "user3",
+        "username": "khach3",
+        "restaurant": "nhahang3",
+        "shipper": None,
         "status": "pending",
         "days_ago": 2,
         "note": "Ít đá, không bỏ hành.",
         "lines": [("Bún bò Huế", 1), ("Cà phê sữa đá", 1), ("Bánh flan caramel", 2)],
     },
     {
-        "username": "user1",
+        "username": "khach1",
+        "restaurant": "nhahang1",
+        "shipper": None,
         "status": "confirmed",
         "days_ago": 4,
         "note": None,
         "lines": [("Cơm gà xối mỡ", 1), ("Nước cam ép", 1)],
     },
     {
-        "username": "user4",
+        "username": "khach2",
+        "restaurant": "nhahang2",
+        "shipper": None,
         "status": "confirmed",
         "days_ago": 5,
         "note": "Thêm tương ớt.",
         "lines": [("Bún chả Hà Nội", 2), ("Trà sữa trân châu", 2)],
     },
     {
-        "username": "user2",
+        "username": "khach3",
+        "restaurant": "nhahang3",
+        "shipper": "shipper1",
         "status": "shipping",
         "days_ago": 7,
         "note": None,
         "lines": [("Mì Quảng", 1), ("Chả giò chiên", 1)],
     },
     {
-        "username": "user3",
+        "username": "khach1",
+        "restaurant": "nhahang1",
+        "shipper": "shipper2",
         "status": "shipping",
         "days_ago": 9,
         "note": "Để trước cửa giúp em.",
         "lines": [("Cơm chiên hải sản", 1), ("Sinh tố bơ", 1)],
     },
     {
-        "username": "user1",
+        "username": "khach2",
+        "restaurant": "nhahang2",
+        "shipper": "shipper3",
         "status": "completed",
         "days_ago": 12,
         "note": None,
         "lines": [("Bún riêu cua", 1), ("Chè ba màu", 1), ("Trà đá", 2)],
     },
     {
-        "username": "user4",
+        "username": "khach3",
+        "restaurant": "nhahang3",
+        "shipper": "shipper1",
         "status": "completed",
         "days_ago": 15,
         "note": None,
         "lines": [("Cơm rang dưa bò", 2), ("Nem chua rán", 1)],
     },
     {
-        "username": "user2",
+        "username": "khach1",
+        "restaurant": "nhahang1",
+        "shipper": None,
         "status": "cancelled",
         "days_ago": 18,
         "note": "Đặt nhầm, xin huỷ.",
@@ -313,11 +383,11 @@ SEED_ORDERS: list[dict] = [
     },
 ]
 
-# Giỏ hàng mẫu cho user1 để FE có sẵn màn hình giỏ hàng
+# Giỏ hàng mẫu cho khach1 để FE có sẵn màn hình giỏ hàng
 SEED_CART: list[tuple[str, str, int]] = [
-    ("user1", "Cơm rang dưa bò", 1),
-    ("user1", "Trà sữa trân châu", 2),
-    ("user1", "Chả giò chiên", 1),
+    ("khach1", "Cơm rang dưa bò", 1),
+    ("khach1", "Trà sữa trân châu", 2),
+    ("khach1", "Chả giò chiên", 1),
 ]
 
 
@@ -333,10 +403,29 @@ def _use_utf8_console() -> None:
             pass
 
 
+def remove_legacy_seed_users(db: Session) -> list[str]:
+    """Xoá 4 tài khoản mẫu cũ (user1..user4) để bộ seed đúng 10 tài khoản.
+
+    Chỉ xoá khi username VÀ email đều khớp dữ liệu mẫu cũ -> không đụng tài khoản thật.
+    Xoá user sẽ cascade xoá đơn / giỏ của chính tài khoản mẫu đó.
+    """
+    removed: list[str] = []
+    for username, email in LEGACY_SEED_USERS.items():
+        user = db.scalar(select(User).where(User.username == username))
+        if user is not None and user.email == email:
+            db.delete(user)
+            removed.append(username)
+    if removed:
+        db.commit()
+    return removed
+
+
 def seed_users(db: Session) -> dict[str, User]:
-    """Tạo (hoặc cập nhật) 1 admin + 4 user. Trả về map username -> User."""
+    """Tạo (hoặc cập nhật) 10 tài khoản theo vai trò. Trả về map username -> User."""
     users: dict[str, User] = {}
     for data in SEED_USERS:
+        role = data["role"]
+        is_admin = role == ROLE_ADMIN
         user = db.scalar(select(User).where(User.username == data["username"]))
         if user is None:
             user = User(
@@ -345,7 +434,8 @@ def seed_users(db: Session) -> dict[str, User]:
                 full_name=data["full_name"],
                 email=data["email"],
                 is_active=True,
-                is_admin=data["is_admin"],
+                is_admin=is_admin,
+                role=role,
             )
             db.add(user)
         else:
@@ -353,7 +443,8 @@ def seed_users(db: Session) -> dict[str, User]:
             user.full_name = data["full_name"]
             user.email = data["email"]
             user.is_active = True
-            user.is_admin = data["is_admin"]
+            user.is_admin = is_admin
+            user.role = role
             user.hashed_password = hash_password(SEED_PASSWORD)
         users[data["username"]] = user
     db.commit()
@@ -421,10 +512,14 @@ def seed_orders(
     now = datetime.now()
     for data in SEED_ORDERS:
         user = users[data["username"]]
+        restaurant = users[data["restaurant"]]
+        shipper = users[data["shipper"]] if data.get("shipper") else None
         created_at = now - timedelta(days=data["days_ago"], hours=2)
 
         order = Order(
             user_id=user.id,  # FK phải là id thật của user vừa tạo
+            restaurant_id=restaurant.id,
+            shipper_id=shipper.id if shipper else None,
             status=data["status"],
             note=data["note"],
             total_amount=Decimal("0"),
@@ -472,22 +567,32 @@ def seed_cart(
 
 def print_summary(db: Session) -> None:
     print("\n===== DỮ LIỆU MẪU ĐÃ SẴN SÀNG =====")
-    print(f"Users      : {len(SEED_USERS)} (admin + 4 user, mật khẩu: {SEED_PASSWORD})")
+    print(f"Users      : {len(SEED_USERS)} tài khoản / mật khẩu chung {SEED_PASSWORD}")
     print(f"Categories : {db.query(Category).count()}")
     print(f"Items      : {db.query(Item).count()}")
     print(f"Cart items : {db.query(CartItem).count()}")
     print(f"Orders     : {db.query(Order).count()}")
     print(f"Order lines: {db.query(OrderItem).count()}")
-    print("\nTài khoản đăng nhập thử:")
-    print(f"  admin / {SEED_PASSWORD}   -> is_admin = 1")
-    for username in ("user1", "user2", "user3", "user4"):
-        print(f"  {username} / {SEED_PASSWORD}")
+    print("\nTài khoản đăng nhập thử (mật khẩu chung 123456):")
+    groups = {
+        "admin": "admin",
+        "khách hàng": "khach1, khach2, khach3",
+        "nhà hàng": "nhahang1, nhahang2, nhahang3",
+        "shipper": "shipper1, shipper2, shipper3",
+    }
+    for label, accounts in groups.items():
+        print(f"  {label:<11}: {accounts}")
+    print("\nTrang quản trị:")
+    print("  /login       đăng nhập, tự chuyển theo vai trò")
+    print("  /admin       quản trị đơn hàng + tài khoản")
+    print("  /restaurant  nhà hàng xác nhận đơn")
+    print("  /shipper     shipper nhận giao + báo đã giao")
     print("\nĐơn hàng theo trạng thái:")
     for status in ("pending", "confirmed", "shipping", "completed", "cancelled"):
         count = db.query(Order).filter(Order.status == status).count()
         print(f"  {status:<10}: {count}")
-    print("\nGợi ý test luồng đặt hàng: đăng nhập user1 -> GET /api/cart (có sẵn 3 món)")
-    print("-> POST /api/orders/checkout -> GET /api/cart phải trả về giỏ trống.")
+    print("\nGợi ý test luồng đặt hàng: đăng nhập khach1 -> GET /api/cart (có sẵn 3 món)")
+    print("-> POST /api/orders/checkout -> nhahang1 xác nhận -> shipper1 nhận giao -> đã giao.")
 
 
 def main() -> int:
@@ -508,6 +613,9 @@ def main() -> int:
 
     db = SessionLocal()
     try:
+        removed = remove_legacy_seed_users(db)
+        if removed:
+            print(f"Đã xoá tài khoản mẫu cũ: {', '.join(removed)}")
         users = seed_users(db)
         categories = seed_categories(db)
         items = seed_items(db, categories)

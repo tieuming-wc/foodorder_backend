@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import ROLE_ADMIN, ROLE_LABELS, ROLE_RESTAURANT, ROLE_SHIPPER, User
 
 # auto_error=False: tự trả 401 (thay vì 403 mặc định của FastAPI) khi thiếu token
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -52,9 +52,34 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     Chưa đăng nhập vẫn là 401 (do get_current_user), đã đăng nhập nhưng không phải
     admin thì 403. Dùng trong router:  admin: User = Depends(get_current_admin)
     """
-    if not current_user.is_admin:
+    if not (current_user.is_admin or current_user.role == ROLE_ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ admin mới được thực hiện thao tác này",
         )
     return current_user
+
+
+def require_role(*roles: str):
+    """Dependency kiểm tra vai trò: token phải thuộc 1 trong các role truyền vào.
+
+    Dùng cho router: dependencies=[Depends(require_role(ROLE_RESTAURANT))]
+    """
+
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role in roles:
+            return current_user
+        # Tài khoản admin luôn đi qua được trang admin (phòng khi role chưa đồng bộ)
+        if ROLE_ADMIN in roles and current_user.is_admin:
+            return current_user
+        allowed = ", ".join(ROLE_LABELS.get(role, role) for role in roles)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Chức năng này chỉ dành cho tài khoản {allowed}",
+        )
+
+    return dependency
+
+
+get_current_restaurant = require_role(ROLE_RESTAURANT)
+get_current_shipper = require_role(ROLE_SHIPPER)

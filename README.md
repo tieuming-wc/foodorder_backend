@@ -130,7 +130,15 @@ Kiểm tra:
 | GET | `/api/orders/me` | Toàn bộ đơn tôi đã đặt, mới nhất lên đầu (cần token). Lọc `?status=pending` | |
 | PUT | `/api/orders/{id}/cancel` | Huỷ đơn của tôi (cần token), **chỉ khi đơn đang `pending`** | |
 | GET | `/api/admin/orders` | Danh sách đơn của **mọi khách** (chỉ admin). Lọc `?status=`, phân trang `?page=1&limit=20` | |
-| PUT | `/api/admin/orders/{id}/status` | Đổi trạng thái đơn (chỉ admin): `confirmed` / `shipping` / `completed` / `cancelled`, theo đúng luồng | |
+| PUT | `/api/admin/orders/{id}/status` | Đổi trạng thái đơn (chỉ admin): `confirmed` / `shipping` / `completed` / `cancelled`, theo đúng luồng |
+| GET | `/api/admin/accounts` | Danh sách tài khoản, lọc `?role=admin\|customer\|restaurant\|shipper` (chỉ admin) |
+| PUT | `/api/admin/accounts/{id}/role` | Đổi vai trò tài khoản (chỉ admin) |
+| GET | `/api/restaurant/orders` | Đơn được gán cho nhà hàng đang đăng nhập, lọc `?status=` (chỉ nhà hàng) |
+| PUT | `/api/restaurant/orders/{id}/confirm` | Nhà hàng xác nhận đơn: `pending` → `confirmed` |
+| GET | `/api/shipper/orders/available` | Đơn đã xác nhận, chưa có shipper nhận (chỉ shipper) |
+| GET | `/api/shipper/orders/mine` | Đơn shipper đang đăng nhập đã nhận (chỉ shipper) |
+| PUT | `/api/shipper/orders/{id}/accept` | Shipper nhận giao: `confirmed` → `shipping` |
+| PUT | `/api/shipper/orders/{id}/delivered` | Shipper báo đã giao: `shipping` → `completed` | |
 
 Khi lỗi, API trả về JSON dạng `{"detail": "..."}`. Ví dụ: 404 khi không tìm thấy, 422 khi dữ liệu gửi lên sai, 401 khi thiếu token, 403 khi không đủ quyền.
 
@@ -189,6 +197,32 @@ Ghi chú:
 - Token ký bằng `SECRET_KEY` trong `.env`; đổi khoá là mọi token cũ mất hiệu lực.
 - `ACCESS_TOKEN_EXPIRE_MINUTES` (mặc định 1440 = 1 ngày) quy định token sống bao lâu.
 - Tài khoản bị đặt `is_active = 0` trong bảng `users` sẽ không đăng nhập / dùng token được nữa.
+
+## 7c. 10 tài khoản demo và 3 trang quản trị
+
+Chạy `python seed.py` để tạo đúng **10 tài khoản**, mật khẩu chung **`123456`**:
+
+| Vai trò (`users.role`) | Tài khoản | Trang |
+|---|---|---|
+| `admin` (1) | `admin` | http://127.0.0.1:8000/admin |
+| `customer` (3 khách) | `khach1`, `khach2`, `khach3` | Chưa có trang riêng, dùng API đặt món (`/docs`) |
+| `restaurant` (3 nhà hàng) | `nhahang1`, `nhahang2`, `nhahang3` | http://127.0.0.1:8000/restaurant |
+| `shipper` (3) | `shipper1`, `shipper2`, `shipper3` | http://127.0.0.1:8000/shipper |
+
+Mở http://127.0.0.1:8000/login, đăng nhập bằng tài khoản trên, hệ thống tự chuyển
+tới trang đúng vai trò (tài khoản khách chỉ báo đăng nhập thành công):
+
+- **`/admin`**: xem toàn bộ đơn, duyệt / chuyển giao / hoàn thành / huỷ, xem 10 tài khoản và đổi vai trò.
+- **`/restaurant`**: xem đơn được gán cho nhà hàng mình, bấm **Xác nhận đơn** (Chờ duyệt → Đã xác nhận).
+- **`/shipper`**: xem đơn đã xác nhận chưa ai nhận, bấm **Nhận giao** (→ Đang giao), rồi **Đã giao** (→ Hoàn thành).
+
+Các trang là HTML + JS thuần trong `app/static/`, FastAPI phục vụ trực tiếp, không cần build.
+Mỗi API đều kiểm tra token + vai trò: sai vai trò trả **403**, nhà hàng/shipper chỉ thấy đơn của mình.
+
+> Database cũ chưa có cột `users.role` và 2 cột `orders.restaurant_id` / `orders.shipper_id`?
+> Server tự thêm khi khởi động (xem `app/db/migrations.py`), hoặc chạy `sql/roles.sql` trong Workbench.
+> Chạy lại `seed.py` nhiều lần không nhân đôi dữ liệu; 4 tài khoản mẫu cũ `user1..user4`
+> (đúng username + email mẫu) sẽ được xoá để bộ demo còn đúng 10 tài khoản.
 
 ## 8. Frontend nối với backend thế nào?
 

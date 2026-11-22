@@ -21,6 +21,35 @@ _COLUMN_MIGRATIONS: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
+        "users",
+        "role",
+        [
+            "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'customer' "
+            "AFTER is_admin",
+            "ALTER TABLE users ADD INDEX idx_users_role (role)",
+        ],
+    ),
+    (
+        "orders",
+        "restaurant_id",
+        [
+            "ALTER TABLE orders ADD COLUMN restaurant_id INT NULL AFTER user_id",
+            "ALTER TABLE orders ADD INDEX idx_orders_restaurant (restaurant_id)",
+            "ALTER TABLE orders ADD CONSTRAINT fk_orders_restaurant "
+            "FOREIGN KEY (restaurant_id) REFERENCES users (id) ON DELETE SET NULL",
+        ],
+    ),
+    (
+        "orders",
+        "shipper_id",
+        [
+            "ALTER TABLE orders ADD COLUMN shipper_id INT NULL AFTER restaurant_id",
+            "ALTER TABLE orders ADD INDEX idx_orders_shipper (shipper_id)",
+            "ALTER TABLE orders ADD CONSTRAINT fk_orders_shipper "
+            "FOREIGN KEY (shipper_id) REFERENCES users (id) ON DELETE SET NULL",
+        ],
+    ),
+    (
         "items",
         "image_url",
         ["ALTER TABLE items ADD COLUMN image_url VARCHAR(500) NULL AFTER description"],

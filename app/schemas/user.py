@@ -1,6 +1,8 @@
 """Schema = hình dạng dữ liệu đi vào (request) và đi ra (response) của API tài khoản."""
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -31,7 +33,17 @@ class UserOut(BaseModel):
     email: str | None
     is_active: bool
     is_admin: bool
+    role: str
     created_at: datetime
+
+
+class UserRoleUpdate(BaseModel):
+    """Admin đổi vai trò của một tài khoản."""
+
+    role: Literal["admin", "customer", "restaurant", "shipper"] = Field(
+        examples=["restaurant"],
+        description="admin / customer / restaurant / shipper",
+    )
 
 
 class TokenOut(BaseModel):
