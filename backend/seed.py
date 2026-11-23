@@ -1,11 +1,19 @@
+from app.models.user import User
+from app.models.order import Order, OrderItem
 from app.models.food import Food
 from app.models.category import Category
 from app.db.session import SessionLocal
-from sqlalchemy.orm import Session
-import sys
 import os
+import sys
+from sqlalchemy.orm import Session
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "app"))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_ROOT = os.path.dirname(CURRENT_DIR)
+APP_DIR = os.path.join(CURRENT_DIR, "app")
+
+for path in (CURRENT_DIR, BACKEND_ROOT, APP_DIR):
+    if path not in sys.path:
+        sys.path.append(path)
 
 
 def seed_data():
@@ -68,7 +76,7 @@ def seed_data():
             {"category_idx": 2, "name": "Pizza hải sản cỡ vừa", "description": "Pizza đế mỏng phủ phô mai và tôm mực",
                 "price": 120000, "image": "https://images.unsplash.com/photo-1513104890138-7c749659a591"},
             {"category_idx": 2, "name": "Gà rán lắc sốt cay (3 miếng)", "description": "Gà rán giòn rụm đậm vị",
-             "price": 55000, "image": "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58"},
+                "price": 55000, "image": "https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58"},
             {"category_idx": 2, "name": "Khoai tây chiên", "description": "Khoai tây chiên giòn rụm kèm sốt mayonnaise",
                 "price": 25000, "image": "https://images.unsplash.com/photo-1573080496219-bb080dd4f877"},
             {"category_idx": 2, "name": "Xúc xích Đức nướng", "description": "Xúc xích nướng thơm mùi khói",
@@ -103,7 +111,7 @@ def seed_data():
             {"category_idx": 5, "name": "Ức gà áp chảo ngũ cốc", "description": "Thực đơn giảm cân giàu protein và chất xơ",
                 "price": 60000, "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"},
             {"category_idx": 5, "name": "Sinh tố thanh lọc cơ thể (Green Detox)", "description": "Rau bó xôi, táo xanh và cần tây nguyên chất",
-             "price": 40000, "image": "https://images.unsplash.com/photo-1610970881699-44a5587cabec"},
+                "price": 40000, "image": "https://images.unsplash.com/photo-1610970881699-44a5587cabec"},
             {"category_idx": 5, "name": "Sữa chua hạt dưa Hy Lạp", "description": "Sữa chua nguyên chất kèm các loại hạt dinh dưỡng",
                 "price": 45000, "image": "https://images.unsplash.com/photo-1488477181946-6428a0291777"},
         ]
@@ -120,6 +128,117 @@ def seed_data():
                 db.commit()
                 print(
                     f"Đã thêm món: {food.name} vào danh mục {target_category.name}")
+
+        users_seed = [
+            {
+                "username": "admin_demo",
+                "email": "admin@foodorder.local",
+                "password_hash": "hashed_admin_password_123",
+                "full_name": "Admin FoodOrder",
+                "role": "admin",
+                "status": 1,
+            },
+            {
+                "username": "user1_demo",
+                "email": "user1@foodorder.local",
+                "password_hash": "hashed_user1_password_123",
+                "full_name": "Nguyễn Văn A",
+                "role": "customer",
+                "status": 1,
+            },
+            {
+                "username": "user2_demo",
+                "email": "user2@foodorder.local",
+                "password_hash": "hashed_user2_password_123",
+                "full_name": "Trần Thị B",
+                "role": "customer",
+                "status": 1,
+            },
+        ]
+
+        seeded_users = []
+        for u_data in users_seed:
+            existing_user = db.query(User).filter(
+                User.email == u_data["email"]).first()
+            if not existing_user:
+                u = User(**u_data)
+                db.add(u)
+                db.commit()
+                db.refresh(u)
+                seeded_users.append(u)
+            else:
+                seeded_users.append(existing_user)
+
+        all_foods = db.query(Food).order_by(Food.id.asc()).all()
+        customer = next(
+            (u for u in seeded_users if u.role == "customer"),
+            seeded_users[0],
+        )
+
+        if len(all_foods) >= 3 and db.query(Order).count() == 0:
+            orders_spec = [
+                {
+                    "order_status": "Đã hoàn thành",
+                    "payment_method": "COD",
+                    "payment_status": "Đã thanh toán",
+                    "discount_amount": 0,
+                    "lines": [
+                        (all_foods[0], 3),
+                        (all_foods[1], 2),
+                    ],
+                },
+                {
+                    "order_status": "Đã hoàn thành",
+                    "payment_method": "Banking",
+                    "payment_status": "Đã thanh toán",
+                    "discount_amount": 10000,
+                    "lines": [
+                        (all_foods[0], 2),
+                        (all_foods[2], 4),
+                    ],
+                },
+                {
+                    "order_status": "Chờ xác nhận",
+                    "payment_method": "COD",
+                    "payment_status": "Chưa thanh toán",
+                    "discount_amount": 0,
+                    "lines": [
+                        (all_foods[1], 5),
+                    ],
+                },
+            ]
+
+            for spec in orders_spec:
+                raw_total = sum(float(f.price) * qty for f,
+                                qty in spec["lines"])
+                discount = float(spec["discount_amount"])
+                final_amt = max(0.0, raw_total - discount)
+
+                order = Order(
+                    user_id=customer.id,
+                    total_amount=raw_total,
+                    discount_amount=discount,
+                    final_amount=final_amt,
+                    payment_method=spec["payment_method"],
+                    payment_status=spec["payment_status"],
+                    order_status=spec["order_status"],
+                )
+                db.add(order)
+                db.commit()
+                db.refresh(order)
+
+                for food_obj, qty in spec["lines"]:
+                    line_total = float(food_obj.price) * qty
+                    db.add(
+                        OrderItem(
+                            order_id=order.id,
+                            food_id=food_obj.id,
+                            quantity=qty,
+                            price=food_obj.price,
+                            total_price=line_total,
+                        )
+                    )
+                db.commit()
 
         print("🎉 Seed dữ liệu mẫu thành công hoàn toàn!")
     except Exception as e:
