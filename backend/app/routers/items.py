@@ -7,13 +7,17 @@
     DELETE /api/items/{id}     xoá
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.crud import item as item_crud
 from app.db.session import get_db
-from app.schemas.item import ItemCreate, ItemOut, ItemUpdate
+from app.models.item import Item
+from app.models.order import OrderItem
+from app.schemas.item import ItemCreate, ItemOut, ItemUpdate, PopularItemOut
 
 router = APIRouter(prefix="/items", tags=["Items"])
+POPULAR_ITEMS_LIMIT = 4
 
 
 def get_item_or_404(item_id: int, db: Session = Depends(get_db)):
@@ -26,6 +30,24 @@ def get_item_or_404(item_id: int, db: Session = Depends(get_db)):
 @router.get("", response_model=list[ItemOut])
 def list_items(q: str | None = None, db: Session = Depends(get_db)):
     return item_crud.get_items(db, keyword=q)
+
+
+@router.get("/popular", response_model=list[PopularItemOut])
+def list_popular_items(db: Session = Depends(get_db)):
+    sold_quantity = func.sum(OrderItem.quantity).label("sold_quantity")
+    rows = db.execute(
+        select(Item, sold_quantity)
+        .join(OrderItem, OrderItem.item_id == Item.id)
+        .where(Item.is_available.is_(True))
+        .group_by(Item.id)
+        .order_by(sold_quantity.desc(), Item.id.asc())
+        .limit(POPULAR_ITEMS_LIMIT)
+    ).all()
+
+    return [
+        {"item": item, "sold_quantity": int(quantity)}
+        for item, quantity in rows
+    ]
 
 
 @router.get("/{item_id}", response_model=ItemOut)

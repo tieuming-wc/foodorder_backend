@@ -24,7 +24,10 @@ class CartTestCase(unittest.TestCase):
         self.db = sessionmaker(bind=self.engine)()
 
         self.user = User(
-            username="an", email="an@example.com", password_hash="hash", full_name="Nguyễn An"
+            full_name="Nguyễn An",
+            phone="0900000000",
+            email="an@example.com",
+            hashed_password="hash",
         )
         self.com = Food(name="Cơm rang", price=Decimal("45000"), stock=10)
         self.tra = Food(name="Trà đá", price=Decimal("5000"), stock=100)
