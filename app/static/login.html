@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đăng nhập · Savors</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/login" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 8" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M2 7c2.6-3.6 6-5.4 10-5.4S19.4 3.4 22 7"></path></svg>
+        </span>
+        <span class="brand-name">Savors</span>
+      </a>
+      <nav class="header-nav">
+        <a href="/admin">Quản trị</a>
+        <a href="/restaurant">Nhà hàng</a>
+        <a href="/shipper">Shipper</a>
+      </nav>
+      <div class="header-actions">
+        <a class="header-login" href="/docs">API</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container auth-page">
+    <div class="auth-card">
+      <aside class="auth-aside">
+        <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1000&q=80" alt="Không gian nhà hàng Savors" />
+        <div class="auth-quote">
+          <p>Savors · Đối tác vận hành</p>
+          <h2>Một bữa ngon,<br>trọn vẹn từ bếp đến tay.</h2>
+        </div>
+      </aside>
+
+      <section class="auth-panel">
+        <span class="eyebrow eyebrow--gold">Hệ thống đối tác Savors</span>
+        <h1>Chào mừng trở lại.</h1>
+        <p>Đăng nhập để vào trang quản trị, nhà hàng hoặc giao hàng theo đúng vai trò của bạn.</p>
+
+        <form id="loginForm" novalidate>
+          <div class="field">
+            <label for="username">Tên đăng nhập</label>
+            <input id="username" autocomplete="username" required placeholder="admin" />
+          </div>
+          <div class="field">
+            <label for="password">Mật khẩu</label>
+            <input id="password" type="password" autocomplete="current-password" required placeholder="••••••" />
+          </div>
+          <p class="auth-error" id="error" hidden></p>
+          <button class="btn btn-gold btn-block" type="submit" id="submitBtn">Đăng nhập</button>
+        </form>
+
+        <div id="notice"></div>
+
+        <div class="demo-box">
+          <b>10 tài khoản demo · mật khẩu 123456</b>
+          <div class="demo-row"><span>Quản trị</span><code>admin</code></div>
+          <div class="demo-row"><span>Khách hàng</span><code>khach1 · khach2 · khach3</code></div>
+          <div class="demo-row"><span>Nhà hàng</span><code>nhahang1 · nhahang2 · nhahang3</code></div>
+          <div class="demo-row"><span>Shipper</span><code>shipper1 · shipper2 · shipper3</code></div>
+        </div>
+
+        <p class="auth-note">Tài khoản khách hàng đăng nhập sẽ được hướng dẫn dùng API đặt món.</p>
+      </section>
+    </div>
+  </main>
+
+  <div class="container">
+    <div class="auth-foot">
+      <span>© <span id="year">2026</span> Savors. Tinh hoa hương vị, khoảnh khắc.</span>
+      <span>Hỗ trợ đối tác · 1900 0000</span>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    const form = document.getElementById("loginForm");
+    const errorEl = document.getElementById("error");
+    const noticeEl = document.getElementById("notice");
+    const submitBtn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      noticeEl.innerHTML = "";
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Đang đăng nhập...";
+
+      try {
+        const data = await api("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({
+            username: document.getElementById("username").value.trim(),
+            password: document.getElementById("password").value,
+          }),
+        });
+        saveSession(data);
+
+        const page = ROLE_PAGES[data.user.role];
+        if (page) {
+          location.href = page;
+          return;
+        }
+        // Tài khoản khách hàng: 3 trang demo chỉ dành cho admin / nhà hàng / shipper
+        noticeEl.innerHTML =
+          `<div class="notice-box">Đăng nhập thành công với vai trò <b>Khách hàng</b>. ` +
+          `Trang demo có sẵn cho quản trị, nhà hàng và shipper. ` +
+          `Tài khoản khách dùng API đặt món tại <a href="/docs">/docs</a>.</div>`;
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Đăng nhập";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản trị · Savors</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/admin" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 8" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M2 7c2.6-3.6 6-5.4 10-5.4S19.4 3.4 22 7"></path></svg>
+        </span>
+        <span class="brand-name">Savors</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="nav">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="header-nav" id="nav">
+        <a href="/admin" class="active">Quản trị</a>
+        <a href="/restaurant">Nhà hàng</a>
+        <a href="/shipper">Shipper</a>
+      </nav>
+      <div class="header-actions">
+        <span class="header-user">
+          <span class="avatar" data-user-avatar>?</span>
+          <span class="user-meta">
+            <span data-user-name>...</span>
+            <small data-user-role>Quản trị</small>
+          </span>
+        </span>
+        <button class="btn btn-outline btn-sm" type="button" data-logout>Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="page-head">
+      <span class="eyebrow eyebrow--gold">Bảng điều khiển · Quản trị</span>
+      <h1>Toàn cảnh vận hành.</h1>
+      <p>Theo dõi toàn bộ đơn hàng, điều phối nhà hàng và shipper, và quản lý vai trò của 10 tài khoản demo.</p>
+    </div>
+
+    <section class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Tổng đơn</div>
+        <div class="stat-value" data-stat="total">0</div>
+      </div>
+      <div class="stat pending">
+        <div class="stat-label">Chờ duyệt</div>
+        <div class="stat-value" data-stat="pending">0</div>
+      </div>
+      <div class="stat shipping">
+        <div class="stat-label">Đang giao</div>
+        <div class="stat-value" data-stat="shipping">0</div>
+      </div>
+      <div class="stat done">
+        <div class="stat-label">Hoàn thành</div>
+        <div class="stat-value" data-stat="completed">0</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Đơn hàng</h2>
+        <span class="spacer"></span>
+        <select id="statusFilter" aria-label="Lọc theo trạng thái">
+          <option value="">Tất cả trạng thái</option>
+          <option value="pending">Chờ duyệt</option>
+          <option value="confirmed">Đã xác nhận</option>
+          <option value="shipping">Đang giao</option>
+          <option value="completed">Hoàn thành</option>
+          <option value="cancelled">Đã huỷ</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="refreshOrders" type="button">Làm mới</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Đơn</th>
+              <th>Khách</th>
+              <th>Món</th>
+              <th>Tổng tiền</th>
+              <th>Nhà hàng / Shipper</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+            <tr><td colspan="7"><div class="empty">Đang tải đơn hàng...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>10 tài khoản &amp; vai trò</h2>
+        <span class="spacer"></span>
+        <select id="roleFilter" aria-label="Lọc theo vai trò">
+          <option value="">Tất cả vai trò</option>
+          <option value="admin">Quản trị</option>
+          <option value="customer">Khách hàng</option>
+          <option value="restaurant">Nhà hàng</option>
+          <option value="shipper">Shipper</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="refreshAccounts" type="button">Làm mới</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tên đăng nhập</th>
+              <th>Họ tên</th>
+              <th>Email</th>
+              <th>Vai trò</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="accountsBody">
+            <tr><td colspan="6"><div class="empty">Đang tải tài khoản...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const ME = requireRole("admin");
+    let orders = [];
+    let accounts = [];
+
+    const openActions = {
+      pending: [
+        { status: "confirmed", label: "Duyệt đơn", cls: "primary" },
+        { status: "cancelled", label: "Huỷ", cls: "danger" },
+      ],
+      confirmed: [
+        { status: "shipping", label: "Chuyển giao", cls: "primary" },
+        { status: "cancelled", label: "Huỷ", cls: "danger" },
+      ],
+      shipping: [{ status: "completed", label: "Hoàn thành", cls: "primary" }],
+    };
+
+    function orderRow(order) {
+      const actions = (openActions[order.status] || [])
+        .map(
+          (action) =>
+            `<button class="btn small ${action.cls}" data-action="status" data-id="${order.id}" ` +
+            `data-status="${action.status}">${action.label}</button>`
+        )
+        .join("") || `<span class="muted">—</span>`;
+
+      const restaurant = order.restaurant ? escapeHtml(order.restaurant.full_name) : `<span class="muted">Chưa gán</span>`;
+      const shipper = order.shipper ? escapeHtml(order.shipper.full_name) : `<span class="muted">Chưa có</span>`;
+
+      return `<tr>
+        <td><b>#${order.id}</b><br><span class="muted">${formatDate(order.created_at)}</span></td>
+        <td>${escapeHtml(order.user.full_name || order.user.username)}<br><span class="muted">@${escapeHtml(order.user.username)}</span></td>
+        <td>${orderItemsHtml(order)}</td>
+        <td><b>${money(order.total_amount)}</b></td>
+        <td>${restaurant}<br><span class="muted">${shipper}</span></td>
+        <td>${statusBadge(order.status)}</td>
+        <td><div class="actions">${actions}</div></td>
+      </tr>`;
+    }
+
+    function renderOrders() {
+      const status = document.getElementById("statusFilter").value;
+      const rows = orders.filter((order) => !status || order.status === status);
+      const body = document.getElementById("ordersBody");
+      body.innerHTML = rows.length
+        ? rows.map(orderRow).join("")
+        : `<tr><td colspan="7"><div class="empty">Không có đơn hàng phù hợp</div></td></tr>`;
+    }
+
+    function renderStats() {
+      setText('[data-stat="total"]', orders.length);
+      setText('[data-stat="pending"]', orders.filter((o) => o.status === "pending").length);
+      setText('[data-stat="shipping"]', orders.filter((o) => o.status === "shipping").length);
+      setText('[data-stat="completed"]', orders.filter((o) => o.status === "completed").length);
+    }
+
+    function renderAccounts() {
+      const role = document.getElementById("roleFilter").value;
+      const rows = accounts.filter((account) => !role || account.role === role);
+      const body = document.getElementById("accountsBody");
+
+      if (!rows.length) {
+        body.innerHTML = `<tr><td colspan="6"><div class="empty">Không có tài khoản phù hợp</div></td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows
+        .map((account) => {
+          const isMe = ME && account.id === ME.id;
+          const options = Object.entries(ROLE_LABELS)
+            .map(
+              ([value, label]) =>
+                `<option value="${value}" ${account.role === value ? "selected" : ""}>${label}</option>`
+            )
+            .join("");
+          return `<tr>
+            <td>${account.id}</td>
+            <td><b>${escapeHtml(account.username)}</b>${isMe ? ' <span class="muted">(bạn)</span>' : ""}</td>
+            <td>${escapeHtml(account.full_name || "")}</td>
+            <td>${escapeHtml(account.email || "")}</td>
+            <td>
+              <select data-role-select="${account.id}" ${isMe ? "disabled" : ""}>${options}</select>
+            </td>
+            <td>
+              ${
+                isMe
+                  ? '<span class="muted">—</span>'
+                  : `<button class="btn small" data-action="role" data-id="${account.id}">Lưu vai trò</button>`
+              }
+            </td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    async function loadOrders() {
+      try {
+        const data = await api("/admin/orders?limit=100");
+        orders = data.items;
+        renderStats();
+        renderOrders();
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    async function loadAccounts() {
+      try {
+        accounts = await api("/admin/accounts");
+        renderAccounts();
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    bindActions(async ({ action, id, status }) => {
+      if (action === "status") {
+        try {
+          await api(`/admin/orders/${id}/status`, {
+            method: "PUT",
+            body: JSON.stringify({ status }),
+          });
+          toast(`Đã cập nhật đơn #${id}`, "success");
+          loadOrders();
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+      if (action === "role") {
+        const select = document.querySelector(`select[data-role-select="${id}"]`);
+        try {
+          await api(`/admin/accounts/${id}/role`, {
+            method: "PUT",
+            body: JSON.stringify({ role: select.value }),
+          });
+          toast("Đã đổi vai trò tài khoản", "success");
+          loadAccounts();
+        } catch (error) {
+          toast(error.message);
+        }
+      }
+    });
+
+    document.getElementById("statusFilter").addEventListener("change", renderOrders);
+    document.getElementById("roleFilter").addEventListener("change", renderAccounts);
+    document.getElementById("refreshOrders").addEventListener("click", loadOrders);
+    document.getElementById("refreshAccounts").addEventListener("click", loadAccounts);
+
+    if (ME) {
+      loadOrders();
+      loadAccounts();
+    }
+  </script>
+</body>
+</html>

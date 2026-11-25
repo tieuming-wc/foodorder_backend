@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nhà hàng · Savors</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/restaurant" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 8" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M2 7c2.6-3.6 6-5.4 10-5.4S19.4 3.4 22 7"></path></svg>
+        </span>
+        <span class="brand-name">Savors</span>
+      </a>
+      <button class="nav-toggle" type="button" aria-label="Mở menu" aria-expanded="false" aria-controls="nav">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="header-nav" id="nav">
+        <a href="/admin">Quản trị</a>
+        <a href="/restaurant" class="active">Nhà hàng</a>
+        <a href="/shipper">Shipper</a>
+      </nav>
+      <div class="header-actions">
+        <span class="header-user">
+          <span class="avatar" data-user-avatar>?</span>
+          <span class="user-meta">
+            <span data-user-name>...</span>
+            <small data-user-role>Nhà hàng</small>
+          </span>
+        </span>
+        <button class="btn btn-outline btn-sm" type="button" data-logout>Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="page-head">
+      <span class="eyebrow eyebrow--gold">Bếp Savors · Nhà hàng</span>
+      <h1>Đơn của nhà hàng.</h1>
+      <p>Xác nhận đơn khách đặt để shipper có thể nhận giao, và theo dõi tiến độ từng đơn.</p>
+    </div>
+
+    <section class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Tổng đơn</div>
+        <div class="stat-value" data-stat="total">0</div>
+      </div>
+      <div class="stat pending">
+        <div class="stat-label">Chờ xác nhận</div>
+        <div class="stat-value" data-stat="pending">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Đã xác nhận</div>
+        <div class="stat-value" data-stat="confirmed">0</div>
+      </div>
+      <div class="stat done">
+        <div class="stat-label">Hoàn thành</div>
+        <div class="stat-value" data-stat="completed">0</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Danh sách đơn</h2>
+        <span class="spacer"></span>
+        <select id="statusFilter" aria-label="Lọc theo trạng thái">
+          <option value="">Tất cả trạng thái</option>
+          <option value="pending">Chờ duyệt</option>
+          <option value="confirmed">Đã xác nhận</option>
+          <option value="shipping">Đang giao</option>
+          <option value="completed">Hoàn thành</option>
+          <option value="cancelled">Đã huỷ</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="refresh" type="button">Làm mới</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Đơn</th>
+              <th>Khách</th>
+              <th>Món</th>
+              <th>Tổng tiền</th>
+              <th>Shipper</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+            <tr><td colspan="7"><div class="empty">Đang tải đơn hàng...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const ME = requireRole("restaurant");
+    let orders = [];
+
+    function orderRow(order) {
+      const action =
+        order.status === "pending"
+          ? `<button class="btn small primary" data-action="confirm" data-id="${order.id}">Xác nhận đơn</button>`
+          : `<span class="muted">—</span>`;
+      const shipper = order.shipper
+        ? `${escapeHtml(order.shipper.full_name)}<br><span class="muted">@${escapeHtml(order.shipper.username)}</span>`
+        : `<span class="muted">Chưa có</span>`;
+
+      return `<tr>
+        <td><b>#${order.id}</b><br><span class="muted">${formatDate(order.created_at)}</span></td>
+        <td>${escapeHtml(order.user.full_name || order.user.username)}<br><span class="muted">@${escapeHtml(order.user.username)}</span></td>
+        <td>${orderItemsHtml(order)}</td>
+        <td><b>${money(order.total_amount)}</b></td>
+        <td>${shipper}</td>
+        <td>${statusBadge(order.status)}</td>
+        <td><div class="actions">${action}</div></td>
+      </tr>`;
+    }
+
+    function render() {
+      const status = document.getElementById("statusFilter").value;
+      const rows = orders.filter((order) => !status || order.status === status);
+      document.getElementById("ordersBody").innerHTML = rows.length
+        ? rows.map(orderRow).join("")
+        : `<tr><td colspan="7"><div class="empty">Chưa có đơn hàng nào</div></td></tr>`;
+
+      setText('[data-stat="total"]', orders.length);
+      setText('[data-stat="pending"]', orders.filter((o) => o.status === "pending").length);
+      setText('[data-stat="confirmed"]', orders.filter((o) => o.status === "confirmed").length);
+      setText('[data-stat="completed"]', orders.filter((o) => o.status === "completed").length);
+    }
+
+    async function load() {
+      try {
+        orders = await api("/restaurant/orders");
+        render();
+      } catch (error) {
+        toast(error.message);
+      }
+    }
+
+    bindActions(async ({ action, id }) => {
+      if (action !== "confirm") return;
+      try {
+        await api(`/restaurant/orders/${id}/confirm`, { method: "PUT" });
+        toast(`Đã xác nhận đơn #${id}`, "success");
+        load();
+      } catch (error) {
+        toast(error.message);
+      }
+    });
+
+    document.getElementById("statusFilter").addEventListener("change", render);
+    document.getElementById("refresh").addEventListener("click", load);
+
+    if (ME) load();
+  </script>
+</body>
+</html>

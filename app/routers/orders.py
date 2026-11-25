@@ -1,0 +1,111 @@
+"""API đơn hàng của user đang đăng nhập. Đường dẫn đầy đủ:
+
+    POST /api/orders/checkout           đặt hàng từ giỏ (tự xoá giỏ sau khi tạo đơn)
+    GET /api/orders/me                  toàn bộ đơn đã đặt, mới nhất lên đầu
+    PUT /api/orders/{order_id}/cancel   tự huỷ đơn của chính mình
+
+Cả hai API đều bắt buộc gửi token: Authorization: Bearer <access_token>
+
+Quy tắc quan trọng:
+- Mỗi user chỉ thấy / chỉ huỷ được đơn có user_id trùng với user trong token.
+  Đơn của người khác trả 404 (không lộ đơn đó có thật hay không).
+- Chỉ đơn đang "pending" (Chờ duyệt) mới được huỷ. Đơn "shipping" (Đang giao),
+  "completed" (Hoàn thành) hay "confirmed" (Đã xác nhận) đều bị chặn với 400.
+"""
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.core.deps import get_current_user
+from app.crud import cart as cart_crud
+from app.crud import order as order_crud
+from app.db.session import get_db
+from app.models.order import ORDER_STATUSES, Order
+from app.models.user import User
+from app.schemas.checkout import CheckoutIn, CheckoutOut
+from app.schemas.order import CancelOrderOut, OrderOut
+
+router = APIRouter(prefix="/orders", tags=["Orders"])
+
+# Thông báo lỗi riêng cho từng trạng thái, để FE hiển thị dễ hiểu
+_CANNOT_CANCEL_REASON = {
+    "confirmed": "Đơn hàng đã được xác nhận nên không thể huỷ",
+    "shipping": "Đơn hàng đang giao nên không thể huỷ",
+    "completed": "Đơn hàng đã hoàn thành nên không thể huỷ",
+    "cancelled": "Đơn hàng này đã bị huỷ trước đó",
+}
+
+
+@router.post("/checkout", response_model=CheckoutOut, status_code=201)
+def checkout(
+    data: CheckoutIn | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Đặt hàng: biến toàn bộ giỏ hàng thành 1 đơn, sau đó giỏ phải TRỐNG.
+
+    Đơn + việc dọn giỏ nằm trong cùng 1 transaction (xem order_crud.checkout_cart):
+    tạo đơn lỗi thì giỏ không bị mất món.
+    """
+    cart_items = cart_crud.get_cart_items(db, current_user.id)
+    if not cart_items:
+        raise HTTPException(
+            status_code=400,
+            detail="Giỏ hàng đang trống, hãy thêm món trước khi đặt hàng",
+        )
+
+    order = order_crud.checkout_cart(
+        db,
+        user_id=current_user.id,
+        cart_items=cart_items,
+        note=data.note if data else None,
+        # Chia đơn cho nhà hàng ít đơn nhất trong 3 tài khoản nhà hàng
+        restaurant_id=order_crud.pick_restaurant_id(db),
+    )
+    return CheckoutOut(
+        message=f"Đặt hàng thành công, đơn #{order.id} đang chờ duyệt",
+        order=OrderOut.model_validate(order),
+        cart_is_cleared=True,
+    )
+
+
+@router.get("/me", response_model=list[OrderOut])
+def list_my_orders(
+    status_filter: str | None = Query(
+        default=None,
+        alias="status",
+        description="Lọc theo trạng thái: pending, confirmed, shipping, completed, cancelled",
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Toàn bộ đơn hàng của user đang đăng nhập, đơn mới nhất lên đầu."""
+    if status_filter is not None and status_filter not in ORDER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Trạng thái không hợp lệ, chọn một trong: {', '.join(ORDER_STATUSES)}",
+        )
+    return order_crud.get_user_orders(db, current_user.id, status=status_filter)
+
+
+@router.put("/{order_id}/cancel", response_model=CancelOrderOut)
+def cancel_my_order(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Huỷ đơn của chính mình khi đơn còn "Chờ duyệt" (pending)."""
+    # Lọc luôn theo user_id -> đơn của người khác coi như không tồn tại
+    order: Order | None = order_crud.get_user_order(db, current_user.id, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail=f"Không tìm thấy đơn hàng id={order_id}")
+
+    if not order.can_cancel:
+        raise HTTPException(
+            status_code=400,
+            detail=_CANNOT_CANCEL_REASON.get(
+                order.status, f"Đơn hàng đang ở trạng thái '{order.status}' nên không thể huỷ"
+            ),
+        )
+
+    order = order_crud.cancel_order(db, order)
+    return CancelOrderOut(message=f"Đã huỷ đơn hàng #{order.id}", order=order)
